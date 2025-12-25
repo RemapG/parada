@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Server, Channel, Message, User } from './types';
-import { INITIAL_SERVERS } from './constants';
+import { Server, Channel, Message, User } from './types.ts';
+import { INITIAL_SERVERS } from './constants.tsx';
 import { 
   Plus, Hash, Volume2, Mic, MicOff, Settings, 
   Send, Smile, Users, Bell, Search, 
@@ -42,7 +42,7 @@ const AuthScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
         
         <form onSubmit={handleSubmit} className="space-y-6 text-left">
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-gray-300 ml-1 italic tracking-widest">YOUR HANDLE</label>
+            <label className="text-sm font-semibold text-gray-300 ml-1 italic tracking-widest uppercase">Your Handle</label>
             <input 
               type="text" 
               autoFocus
@@ -104,8 +104,15 @@ export default function App() {
 
   useEffect(() => {
     if (currentUser && !peerRef.current) {
+      // Accessing Peer from global scope securely
       // @ts-ignore
-      const peer = new Peer(currentUser.id);
+      const PeerClass = window.Peer;
+      if (!PeerClass) {
+        console.error("PeerJS not loaded from CDN");
+        return;
+      }
+      
+      const peer = new PeerClass(currentUser.id);
       
       peer.on('error', (err: any) => {
         console.error('Peer error:', err);
@@ -256,7 +263,7 @@ export default function App() {
           
           <div className="flex-1 space-y-6 overflow-y-auto pr-2 custom-scrollbar">
             <div>
-              <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 ml-4">Lobby</p>
+              <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 ml-4 italic">Lobby</p>
               {activeServer.channels.map(c => (
                 <div 
                   key={c.id} 
@@ -270,7 +277,7 @@ export default function App() {
             </div>
             
             <div className="pt-4 border-t border-white/5">
-               <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 ml-4">Spaces</p>
+               <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 ml-4 italic">Spaces</p>
                <div className="flex items-center px-4 py-3 rounded-2xl text-gray-400 hover:bg-white/5 cursor-pointer">
                  <Compass className="mr-3" size={18} />
                  <span className="text-sm font-bold">Explore</span>
