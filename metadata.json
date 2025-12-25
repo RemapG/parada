@@ -1,6 +1,6 @@
 {
-  "name": "Discord Clone",
-  "description": "A high-fidelity Discord clone for real-time voice calls and screen sharing.",
+  "name": "VibeSpace",
+  "description": "A modern, high-fidelity social platform for real-time video and audio connection.",
   "requestFramePermissions": [
     "camera",
     "microphone",
