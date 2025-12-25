@@ -1,0 +1,12 @@
+
+{
+  "name": "vibespace-clone",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "lucide-react": "^0.562.0",
+    "peerjs": "^1.5.2"
+  }
+}

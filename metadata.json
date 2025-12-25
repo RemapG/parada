@@ -1,0 +1,9 @@
+{
+  "name": "Discord Clone",
+  "description": "A high-fidelity Discord clone for real-time voice calls and screen sharing.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "display-capture"
+  ]
+}
