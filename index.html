@@ -4,38 +4,52 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VibeSpace | Connect & Chill</title>
+  <title>Discord Clone | VibeSpace</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --discord-blurple: #5865f2;
+      --discord-green: #23a559;
+      --discord-yellow: #f0b232;
+      --discord-red: #f23f43;
+      --bg-servers: #1e1f22;
+      --bg-channels: #2b2d31;
+      --bg-chat: #313338;
+    }
     body {
       font-family: 'Outfit', sans-serif;
       margin: 0;
       padding: 0;
       overflow: hidden;
-      background: #08080f;
-      color: #e0e0e0;
+      background: var(--bg-servers);
+      color: #dbdee1;
     }
     #root:empty::before {
-      content: 'Waking up the space...';
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      font-size: 1.2rem;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.2em;
-      color: #8b5cf6;
-      opacity: 0.8;
-      animation: pulse 2s infinite;
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 48px;
+      height: 48px;
+      border: 4px solid rgba(255,255,255,0.1);
+      border-left-color: var(--discord-blurple);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
     }
-    @keyframes pulse {
-      0%, 100% { opacity: 0.4; }
-      50% { opacity: 1; }
+    @keyframes spin {
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+    .server-icon {
+      transition: border-radius 0.2s ease, background-color 0.2s ease;
+    }
+    .server-icon:hover {
+      border-radius: 16px;
+      background-color: var(--discord-blurple);
     }
   </style>
   <script type="importmap">
@@ -53,6 +67,6 @@
 </head>
 <body>
   <div id="root"></div>
-  <script type="module" src="./index.tsx"></script>
+  <script type="module" src="index.tsx"></script>
 </body>
 </html>
