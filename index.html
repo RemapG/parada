@@ -1,10 +1,10 @@
 
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="ru" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Discord Clone | VibeSpace P2P</title>
+  <title>VibeSpace | P2P Discord Clone</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -37,32 +37,19 @@
       align-items: center;
       justify-content: center;
       background: #1e1f22;
-      z-index: 100;
-      transition: opacity 0.4s ease-out;
+      z-index: 1000;
+      transition: opacity 0.5s ease-out;
     }
     .loaded .loading-spinner {
       opacity: 0;
       pointer-events: none;
     }
-    @keyframes pulse-green {
-      0% { box-shadow: 0 0 0 0 rgba(35, 165, 89, 0.7); }
-      70% { box-shadow: 0 0 0 10px rgba(35, 165, 89, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(35, 165, 89, 0); }
-    }
-    .is-speaking {
-      animation: pulse-green 2s infinite;
-      box-shadow: 0 0 0 4px var(--discord-green);
-    }
-    .is-speaking-mini {
-      box-shadow: 0 0 0 2px var(--discord-green);
-      border-radius: 9999px;
-    }
     @keyframes scaleIn {
-      from { opacity: 0; transform: scale(0.9); }
-      to { opacity: 1; transform: scale(1); }
+      from { opacity: 0; transform: scale(0.95) translateY(10px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
     }
-    .scale-in {
-      animation: scaleIn 0.3s ease-out forwards;
+    .animate-scale-in {
+      animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
   </style>
   <script type="importmap">
@@ -83,8 +70,8 @@
   <div id="root"></div>
   <div class="loading-spinner" id="spinner">
     <div class="flex flex-col items-center gap-4">
-      <div class="w-12 h-12 border-4 border-white/10 border-l-[#5865f2] rounded-full animate-spin"></div>
-      <p class="text-[#b5bac1] font-medium animate-pulse">Establishing Mesh Connection...</p>
+      <div class="w-14 h-14 border-4 border-white/5 border-l-[#5865f2] rounded-full animate-spin"></div>
+      <p class="text-[#b5bac1] font-semibold tracking-wide animate-pulse uppercase text-xs">VibeSpace Mesh Initialization</p>
     </div>
   </div>
 
@@ -92,7 +79,9 @@
 
   <script>
     window.addEventListener('load', () => {
-      document.body.classList.add('loaded');
+      setTimeout(() => {
+        document.body.classList.add('loaded');
+      }, 800);
     });
   </script>
 </body>
