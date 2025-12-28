@@ -3,17 +3,17 @@
   "cleanUrls": true,
   "rewrites": [
     {
-      "source": "/((?!.*\\.).*)",
+      "source": "/((?!.*\\.(?:tsx|ts|jsx|js|png|jpg|svg|ico|json|css)).*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
     {
-      "source": "/(.*\\.(tsx|ts|jsx))",
+      "source": "/(.*\\.(?:tsx|ts|jsx|js))",
       "headers": [
         {
           "key": "Content-Type",
-          "value": "application/javascript"
+          "value": "application/javascript; charset=utf-8"
         }
       ]
     },

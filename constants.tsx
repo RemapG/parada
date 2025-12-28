@@ -1,5 +1,5 @@
 
-import { Server, User } from './types';
+import { Server, User } from './types.ts';
 
 export const INITIAL_SERVERS: Server[] = [
   {
