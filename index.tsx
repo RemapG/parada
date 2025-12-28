@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Peer, DataConnection } from 'peerjs';
+import { Peer, DataConnection, MediaConnection } from 'peerjs';
 import { 
   Plus, Hash, Volume2, Mic, MicOff, Settings, Bell, Search, 
   Users as UsersIcon, HelpCircle, Gift, Sticker, Smile, MessageSquare,
@@ -43,6 +43,15 @@ interface Server {
   channels: Channel[];
 }
 
+interface PresenceInfo {
+  userId: string;
+  username: string;
+  avatar: string;
+  serverId: string | null;
+  channelId: string | null;
+  isMuted: boolean;
+}
+
 // --- App Component ---
 const App = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -52,7 +61,8 @@ const App = () => {
   const [servers, setServers] = useState<Server[]>([
     { id: '1', name: 'Global Community', icon: 'https://api.dicebear.com/7.x/initials/svg?seed=GC&backgroundColor=5865f2', channels: [
       { id: 'gen-1', name: 'general', type: 'text' },
-      { id: 'voice-1', name: 'Lounge', type: 'voice' }
+      { id: 'voice-1', name: 'Lounge', type: 'voice' },
+      { id: 'voice-2', name: 'Gaming', type: 'voice' }
     ]}
   ]);
   
@@ -61,6 +71,8 @@ const App = () => {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [messages, setMessages] = useState<Record<string, Message[]>>({});
   const [connections, setConnections] = useState<Record<string, DataConnection>>({});
+  const [voiceCalls, setVoiceCalls] = useState<Record<string, MediaConnection>>({});
+  const [channelPresence, setChannelPresence] = useState<Record<string, PresenceInfo>>({});
   
   // UI States
   const [showCreateServer, setShowCreateServer] = useState(false);
@@ -71,7 +83,10 @@ const App = () => {
   const [copied, setCopied] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -80,13 +95,13 @@ const App = () => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, activeChannelId]);
 
+  // Cleanup effect
   useEffect(() => {
     return () => {
-      if (screenStream) {
-        screenStream.getTracks().forEach(track => track.stop());
-      }
+      localStream?.getTracks().forEach(t => t.stop());
+      screenStream?.getTracks().forEach(t => t.stop());
     };
-  }, [screenStream]);
+  }, [localStream, screenStream]);
 
   const handleLogin = (username: string) => {
     if (!username.trim()) return;
@@ -95,29 +110,137 @@ const App = () => {
     setUser(newUser);
     
     const newPeer = new Peer(id);
+    
+    newPeer.on('open', (peerId) => {
+      console.log('Peer connected with ID:', peerId);
+    });
+
     newPeer.on('connection', (conn) => {
+      conn.on('open', () => {
+        setConnections(prev => ({ ...prev, [conn.peer]: conn }));
+        // Send initial presence to the newcomer
+        if (user) {
+          conn.send({ 
+            type: 'PRESENCE_UPDATE', 
+            presence: { 
+              userId: id, 
+              username: newUser.username, 
+              avatar: newUser.avatar, 
+              serverId: activeServerId, 
+              channelId: activeChannelId,
+              isMuted 
+            } 
+          });
+        }
+      });
       conn.on('data', (data: any) => handleData(data, conn));
     });
+
+    // Handle incoming calls (voice chat)
+    newPeer.on('call', async (call) => {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      call.answer(stream);
+      call.on('stream', (remoteStream) => {
+        setRemoteStreams(prev => ({ ...prev, [call.peer]: remoteStream }));
+      });
+    });
+
     setPeer(newPeer);
   };
 
+  const broadcastData = (data: any) => {
+    Object.values(connections).forEach(conn => {
+      if (conn.open) conn.send(data);
+    });
+  };
+
   const handleData = (data: any, conn: DataConnection) => {
-    if (data.type === 'MSG') {
-      setMessages(prev => ({
-        ...prev,
-        [data.channelId]: [...(prev[data.channelId] || []), data.message]
-      }));
+    switch (data.type) {
+      case 'MSG':
+        setMessages(prev => ({
+          ...prev,
+          [data.channelId]: [...(prev[data.channelId] || []), data.message]
+        }));
+        break;
+      case 'FRIEND_REQ':
+        setFriends(prev => {
+          if (prev.find(f => f.peerId === conn.peer)) return prev;
+          return [...prev, { ...data.user, peerId: conn.peer, status: 'online' }];
+        });
+        setConnections(prev => ({ ...prev, [conn.peer]: conn }));
+        // Auto-reply with our presence
+        conn.send({ 
+          type: 'PRESENCE_UPDATE', 
+          presence: { 
+            userId: user?.id, 
+            username: user?.username, 
+            avatar: user?.avatar, 
+            serverId: activeServerId, 
+            channelId: activeChannelId,
+            isMuted 
+          } 
+        });
+        break;
+      case 'PRESENCE_UPDATE':
+        setChannelPresence(prev => ({
+          ...prev,
+          [data.presence.userId]: data.presence
+        }));
+        break;
+      case 'INVITE':
+        alert(`${data.inviter} пригласил вас на сервер ${data.serverName}!`);
+        break;
     }
-    if (data.type === 'FRIEND_REQ') {
-      setFriends(prev => {
-        if (prev.find(f => f.peerId === conn.peer)) return prev;
-        return [...prev, { ...data.user, peerId: conn.peer, status: 'online' }];
+  };
+
+  // Sync presence whenever channel/server/mute changes
+  useEffect(() => {
+    if (user && peer) {
+      const presence: PresenceInfo = {
+        userId: user.id,
+        username: user.username,
+        avatar: user.avatar,
+        serverId: activeServerId,
+        channelId: activeChannelId,
+        isMuted
+      };
+      broadcastData({ type: 'PRESENCE_UPDATE', presence });
+      
+      // If we joined a voice channel, handle calls
+      const channel = activeServer?.channels.find(c => c.id === activeChannelId);
+      if (channel?.type === 'voice') {
+        startVoiceMesh();
+      } else {
+        stopVoiceMesh();
+      }
+    }
+  }, [activeChannelId, activeServerId, isMuted, user]);
+
+  const startVoiceMesh = async () => {
+    try {
+      const stream = localStream || await navigator.mediaDevices.getUserMedia({ audio: true });
+      setLocalStream(stream);
+
+      // Call everyone already in this voice channel
+      Object.values(channelPresence).forEach(p => {
+        if (p.channelId === activeChannelId && p.userId !== user?.id) {
+          const call = peer!.call(p.userId, stream);
+          call.on('stream', (remoteStr) => {
+            setRemoteStreams(prev => ({ ...prev, [p.userId]: remoteStr }));
+          });
+          setVoiceCalls(prev => ({ ...prev, [p.userId]: call }));
+        }
       });
-      setConnections(prev => ({ ...prev, [conn.peer]: conn }));
+    } catch (err) {
+      console.error("Voice access denied", err);
     }
-    if (data.type === 'INVITE') {
-      alert(`${data.inviter} пригласил вас на сервер ${data.serverName}!`);
-    }
+  };
+
+  const stopVoiceMesh = () => {
+    Object.values(voiceCalls).forEach(call => call.close());
+    setVoiceCalls({});
+    setRemoteStreams({});
+    // Keep local stream for switching but stop if needed
   };
 
   const createServer = (name: string) => {
@@ -173,8 +296,6 @@ const App = () => {
         inviter: user?.username 
       });
       alert(`Приглашение отправлено!`);
-    } else {
-      alert("Друг сейчас не в сети.");
     }
   };
 
@@ -182,17 +303,12 @@ const App = () => {
     if (!text.trim() || !activeChannelId || !user) return;
     const msg: Message = { id: Date.now(), author: user.username, avatar: user.avatar, content: text, timestamp: new Date() };
     setMessages(prev => ({ ...prev, [activeChannelId]: [...(prev[activeChannelId] || []), msg] }));
-    
-    Object.values(connections).forEach(conn => {
-      conn.send({ type: 'MSG', channelId: activeChannelId, message: msg });
-    });
+    broadcastData({ type: 'MSG', channelId: activeChannelId, message: msg });
   };
 
   const toggleScreenShare = async () => {
     if (isScreenSharing) {
-      if (screenStream) {
-        screenStream.getTracks().forEach(track => track.stop());
-      }
+      screenStream?.getTracks().forEach(track => track.stop());
       setScreenStream(null);
       setIsScreenSharing(false);
     } else {
@@ -200,7 +316,6 @@ const App = () => {
         const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
         setScreenStream(stream);
         setIsScreenSharing(true);
-        
         stream.getVideoTracks()[0].onended = () => {
           setIsScreenSharing(false);
           setScreenStream(null);
@@ -219,6 +334,7 @@ const App = () => {
 
   const activeServer = servers.find(s => s.id === activeServerId);
   const activeChannel = activeServer?.channels.find(c => c.id === activeChannelId);
+  const usersInChannel = Object.values(channelPresence).filter(p => p.channelId === activeChannelId);
 
   if (!user) return (
     <div className="h-screen w-screen flex items-center justify-center bg-[#1e1f22]">
@@ -249,6 +365,11 @@ const App = () => {
 
   return (
     <div className="flex h-screen w-screen bg-[#1e1f22] overflow-hidden">
+      {/* Hidden Audio Elements for Remote Streams */}
+      {Object.entries(remoteStreams).map(([peerId, stream]) => (
+        <audio key={peerId} autoPlay ref={el => { if(el) el.srcObject = stream; }} />
+      ))}
+
       {/* Servers List */}
       <nav className="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 space-y-2 border-r border-black/20 flex-shrink-0">
         <div 
@@ -312,9 +433,23 @@ const App = () => {
                   <Plus size={14} className="cursor-pointer hover:text-white transition-colors" onClick={(e) => { e.stopPropagation(); setShowCreateChannel(true); }} />
                </div>
                {activeServer?.channels.map(c => (
-                 <div key={c.id} onClick={() => { setActiveChannelId(c.id); }} className={`flex items-center px-2 py-1.5 rounded mb-[2px] cursor-pointer group transition-all ${activeChannelId === c.id ? 'bg-[#3f4147] text-white shadow-sm' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}>
-                    {c.type === 'text' ? <Hash size={20} className="mr-1.5 opacity-60" /> : <Volume2 size={20} className="mr-1.5 opacity-60" />}
-                    <span className="truncate flex-1 font-medium">{c.name}</span>
+                 <div key={c.id} className="mb-1">
+                    <div onClick={() => { setActiveChannelId(c.id); }} className={`flex items-center px-2 py-1.5 rounded cursor-pointer group transition-all ${activeChannelId === c.id ? 'bg-[#3f4147] text-white shadow-sm' : 'text-[#949ba4] hover:bg-[#35373c] hover:text-[#dbdee1]'}`}>
+                        {c.type === 'text' ? <Hash size={20} className="mr-1.5 opacity-60" /> : <Volume2 size={20} className="mr-1.5 opacity-60" />}
+                        <span className="truncate flex-1 font-medium">{c.name}</span>
+                    </div>
+                    {/* Channel Occupants */}
+                    <div className="ml-6 space-y-1 mt-1">
+                       {Object.values(channelPresence).filter(p => p.channelId === c.id && p.serverId === activeServerId).map(p => (
+                         <div key={p.userId} className="flex items-center gap-2 py-1 px-2 rounded hover:bg-[#35373c]/50 group/user">
+                            <div className={`relative ${!p.isMuted ? 'is-speaking-mini' : ''}`}>
+                               <img src={p.avatar} className="w-6 h-6 rounded-full" />
+                               {p.isMuted && <MicOff size={10} className="absolute -bottom-1 -right-1 text-[#ed4245] bg-[#2b2d31] rounded-full p-[1px]" />}
+                            </div>
+                            <span className="text-sm text-[#949ba4] group-hover/user:text-[#dbdee1] truncate">{p.username}</span>
+                         </div>
+                       ))}
+                    </div>
                  </div>
                ))}
             </div>
@@ -360,13 +495,13 @@ const App = () => {
                  </div>
                ) : (
                  <div className="max-w-4xl mx-auto space-y-4">
-                    <p className="text-[#949ba4] text-[12px] font-bold uppercase tracking-widest px-1">В сети — {friends.length}</p>
+                    <p className="text-[#949ba4] text-[12px] font-bold uppercase tracking-widest px-1">Все друзья — {friends.length}</p>
                     <div className="space-y-1">
                       {friends.map(f => (
                         <div key={f.peerId} className="flex items-center justify-between p-3 border-t border-white/5 hover:bg-[#35373c] rounded-lg group transition-all cursor-pointer">
                            <div className="flex items-center gap-4">
                               <img src={f.avatar} className="w-10 h-10 rounded-full bg-[#1e1f22]" alt={f.username} />
-                              <div><p className="text-white font-bold">{f.username}</p><p className="text-xs text-[#b5bac1]">В сети</p></div>
+                              <div><p className="text-white font-bold">{f.username}</p><p className="text-xs text-[#b5bac1]">Peer ID: {f.peerId.split('-').pop()}</p></div>
                            </div>
                            <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                               <div className="p-2.5 bg-[#1e1f22] rounded-full text-[#b5bac1] hover:text-[#dbdee1] transition-colors shadow-lg"><MessageSquare size={18} /></div>
@@ -430,23 +565,37 @@ const App = () => {
                         </div>
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center gap-4 transition-all hover:scale-105">
-                         <div className={`w-36 h-36 rounded-full p-1.5 bg-[#2b2d31] shadow-2xl relative ${!isMuted ? 'is-speaking' : ''}`}>
-                            <img src={user.avatar} className="w-full h-full rounded-full" alt="avatar" />
-                            {isMuted && <div className="absolute bottom-2 right-2 bg-[#ed4245] p-2 rounded-full border-4 border-[#2b2d31]"><MicOff size={20} className="text-white" /></div>}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6 p-10 max-w-6xl w-full h-full overflow-y-auto content-center">
+                         {/* Local User */}
+                         <div className="flex flex-col items-center gap-3">
+                            <div className={`w-32 h-32 rounded-full p-1 bg-[#2b2d31] shadow-2xl relative transition-all ${!isMuted ? 'is-speaking' : ''}`}>
+                               <img src={user.avatar} className="w-full h-full rounded-full" alt="avatar" />
+                               {isMuted && <div className="absolute bottom-1 right-1 bg-[#ed4245] p-2 rounded-full border-4 border-[#2b2d31]"><MicOff size={16} className="text-white" /></div>}
+                            </div>
+                            <span className="font-bold text-lg text-white truncate w-full text-center">{user.username} (Вы)</span>
                          </div>
-                         <span className="font-bold text-2xl text-white tracking-wide">{user.username}</span>
+                         
+                         {/* Remote Users */}
+                         {usersInChannel.filter(p => p.userId !== user.id).map(p => (
+                            <div key={p.userId} className="flex flex-col items-center gap-3">
+                                <div className={`w-32 h-32 rounded-full p-1 bg-[#2b2d31] shadow-2xl relative transition-all ${!p.isMuted ? 'is-speaking' : ''}`}>
+                                   <img src={p.avatar} className="w-full h-full rounded-full" alt="avatar" />
+                                   {p.isMuted && <div className="absolute bottom-1 right-1 bg-[#ed4245] p-2 rounded-full border-4 border-[#2b2d31]"><MicOff size={16} className="text-white" /></div>}
+                                </div>
+                                <span className="font-bold text-lg text-white truncate w-full text-center">{p.username}</span>
+                            </div>
+                         ))}
                       </div>
                     )}
 
-                    <div className="flex gap-6 bg-[#1e1f22]/80 backdrop-blur p-4 rounded-3xl shadow-2xl border border-white/10">
+                    <div className="flex gap-6 bg-[#1e1f22]/90 backdrop-blur p-4 rounded-3xl shadow-2xl border border-white/10 mb-10">
                        <button onClick={() => setIsMuted(!isMuted)} className={`p-4 rounded-full transition-all hover:scale-110 shadow-lg ${isMuted ? 'bg-[#ed4245]' : 'bg-[#4e5058] hover:bg-[#6d6f78]'}`}>
                          {isMuted ? <MicOff size={28} className="text-white" /> : <Mic size={28} className="text-white" />}
                        </button>
                        <button onClick={toggleScreenShare} className={`p-4 rounded-full transition-all hover:scale-110 shadow-lg ${isScreenSharing ? 'bg-[#23a559]' : 'bg-[#4e5058] hover:bg-[#6d6f78]'}`}>
                          {isScreenSharing ? <MonitorOff size={28} className="text-white" /> : <Monitor size={28} className="text-white" />}
                        </button>
-                       <button onClick={() => setActiveChannelId(activeServer?.channels.find(c => c.type === 'text')?.id || null)} className="bg-[#ed4245] p-4 rounded-full text-white hover:bg-[#c03537] shadow-lg hover:scale-110 transition-all"><PhoneOff size={28} /></button>
+                       <button onClick={() => { setActiveChannelId(activeServer?.channels.find(c => c.type === 'text')?.id || null); stopVoiceMesh(); }} className="bg-[#ed4245] p-4 rounded-full text-white hover:bg-[#c03537] shadow-lg hover:scale-110 transition-all"><PhoneOff size={28} /></button>
                     </div>
                  </div>
                )}

@@ -62,6 +62,10 @@
       animation: pulse-green 2s infinite;
       box-shadow: 0 0 0 3px var(--discord-green);
     }
+    .is-speaking-mini {
+      box-shadow: 0 0 0 2px var(--discord-green);
+      border-radius: 9999px;
+    }
   </style>
   <script type="importmap">
 {
@@ -86,7 +90,6 @@
     </div>
   </div>
 
-  <!-- data-type="module" критически важен для работы импортов внутри Babel -->
   <script type="text/babel" data-presets="react,typescript" data-type="module" src="index.tsx"></script>
 
   <script>
