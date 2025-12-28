@@ -44,15 +44,6 @@
       opacity: 0;
       pointer-events: none;
     }
-    .modal-backdrop {
-      background: rgba(0, 0, 0, 0.85);
-      position: fixed;
-      inset: 0;
-      z-index: 50;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
     @keyframes pulse-green {
       0% { box-shadow: 0 0 0 0 rgba(35, 165, 89, 0.7); }
       70% { box-shadow: 0 0 0 10px rgba(35, 165, 89, 0); }
@@ -82,8 +73,8 @@
     "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
     "lucide-react": "https://esm.sh/lucide-react@0.460.0?bundle",
     "peerjs": "https://esm.sh/peerjs@1.5.4",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
@@ -93,7 +84,7 @@
   <div class="loading-spinner" id="spinner">
     <div class="flex flex-col items-center gap-4">
       <div class="w-12 h-12 border-4 border-white/10 border-l-[#5865f2] rounded-full animate-spin"></div>
-      <p class="text-[#b5bac1] font-medium animate-pulse">Syncing VibeSpace Mesh...</p>
+      <p class="text-[#b5bac1] font-medium animate-pulse">Establishing Mesh Connection...</p>
     </div>
   </div>
 
