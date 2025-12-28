@@ -205,10 +205,6 @@ const App = () => {
           setIsScreenSharing(false);
           setScreenStream(null);
         };
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
       } catch (err) {
         console.error("Error sharing screen:", err);
       }
@@ -480,7 +476,7 @@ const App = () => {
           <div className="bg-[#313338] p-8 rounded-lg w-full max-w-[440px] shadow-2xl" onClick={e => e.stopPropagation()}>
             <h2 className="text-2xl font-bold text-white text-center mb-2">Создайте свой сервер</h2>
             <p className="text-[#b5bac1] text-center mb-8">Назовите свой сервер как душе угодно.</p>
-            <input id="sname" className="w-full bg-[#1e1f22] text-white p-3 rounded mb-8 outline-none border border-black/20 focus:border-[#5865f2] transition-colors" placeholder="Имя сервера" defaultValue={`${user.username}'s server`} />
+            <input id="sname" className="w-full bg-[#1e1f22] text-white p-3 rounded mb-8 outline-none border border-black/20 focus:border-[#5865f2] transition-colors" placeholder="Имя сервера" defaultValue={user?.username + "'s server"} />
             <div className="flex justify-between items-center bg-[#2b2d31] -mx-8 -mb-8 p-4 rounded-b-lg mt-4">
                <button onClick={() => setShowCreateServer(false)} className="text-white hover:underline px-4">Отмена</button>
                <button onClick={() => createServer((document.getElementById('sname') as HTMLInputElement).value)} className="bg-[#5865f2] text-white px-8 py-2.5 rounded font-bold hover:bg-[#4752c4] transition-all">Создать</button>
@@ -548,7 +544,7 @@ const App = () => {
                   <div className="p-4 bg-black/20 rounded-lg text-center"><p className="text-xs text-[#949ba4]">У вас еще нет друзей для приглашения!</p></div>
                 ) : friends.map(f => (
                   <div key={f.peerId} className="flex items-center justify-between p-2 rounded-lg hover:bg-[#2b2d31] transition-colors">
-                     <div className="flex items-center gap-3"><img src={f.avatar} className="w-9 h-9 rounded-full" /><span className="font-bold text-white">{f.username}</span></div>
+                     <div className="flex items-center gap-3"><img src={f.avatar} className="w-9 h-9 rounded-full" alt={f.username} /><span className="font-bold text-white">{f.username}</span></div>
                      <button onClick={() => inviteFriendToServer(f.peerId)} className="border border-[#5865f2] text-[#5865f2] hover:bg-[#5865f2] hover:text-white px-3 py-1 rounded text-xs font-bold transition-all active:scale-95">Пригласить</button>
                   </div>
                 ))}

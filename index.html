@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Discord Clone | VibeSpace P2P</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Добавляем Babel для обработки TSX на лету, если среда не делает это автоматически -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -87,8 +86,8 @@
     </div>
   </div>
 
-  <!-- Используем Babel для обработки index.tsx напрямую, чтобы избежать проблем с MIME-типами -->
-  <script type="text/babel" data-presets="react,typescript" src="index.tsx"></script>
+  <!-- data-type="module" критически важен для работы импортов внутри Babel -->
+  <script type="text/babel" data-presets="react,typescript" data-type="module" src="index.tsx"></script>
 
   <script>
     window.addEventListener('load', () => {
