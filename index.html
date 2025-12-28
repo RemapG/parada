@@ -44,12 +44,19 @@
     @keyframes spin {
       to { transform: translate(-50%, -50%) rotate(360deg); }
     }
-    .server-icon {
-      transition: border-radius 0.2s ease, background-color 0.2s ease;
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
     }
-    .server-icon:hover {
-      border-radius: 16px;
-      background-color: var(--discord-blurple);
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1a1b1e;
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #111214;
     }
   </style>
   <script type="importmap">
@@ -64,9 +71,12 @@
   }
 }
 </script>
+  <!-- Этот скрипт автоматически транспилирует .tsx файлы в браузере -->
+  <script type="module" src="https://esm.sh/run"></script>
 </head>
 <body>
   <div id="root"></div>
-  <script type="module" src="index.tsx"></script>
+  <!-- Меняем type на text/tsx, чтобы загрузчик esm.sh/run подхватил его -->
+  <script type="text/tsx" src="index.tsx"></script>
 </body>
 </html>
