@@ -3,22 +3,13 @@
   "cleanUrls": true,
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!.*\\.).*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
     {
-      "source": "/(.*).tsx",
-      "headers": [
-        {
-          "key": "Content-Type",
-          "value": "application/javascript"
-        }
-      ]
-    },
-    {
-      "source": "/(.*).ts",
+      "source": "/(.*\\.(tsx|ts|jsx))",
       "headers": [
         {
           "key": "Content-Type",
