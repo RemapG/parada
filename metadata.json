@@ -1,9 +1,8 @@
 {
-  "name": "VibeSpace",
-  "description": "A modern, high-fidelity social platform for real-time video and audio connection.",
   "requestFramePermissions": [
     "camera",
-    "microphone",
-    "display-capture"
-  ]
+    "microphone"
+  ],
+  "name": "",
+  "description": ""
 }
