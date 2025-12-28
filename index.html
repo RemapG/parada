@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Discord Clone | VibeSpace</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Загружаем Babel для обработки TSX прямо в браузере -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,6 +16,7 @@
       --bg-servers: #1e1f22;
       --bg-channels: #2b2d31;
       --bg-chat: #313338;
+      --discord-green: #23a559;
     }
     body {
       font-family: 'Outfit', sans-serif;
@@ -44,6 +44,18 @@
       opacity: 0;
       pointer-events: none;
     }
+    
+    /* Анимация "говорения" */
+    .is-speaking {
+      box-shadow: 0 0 0 2px var(--discord-green);
+    }
+
+    .video-preview {
+      aspect-ratio: 16/9;
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden;
+    }
   </style>
   <script type="importmap">
 {
@@ -62,33 +74,30 @@
   <div class="loading-spinner" id="spinner">
     <div class="flex flex-col items-center gap-4">
       <div class="w-12 h-12 border-4 border-white/10 border-l-[#5865f2] rounded-full animate-spin"></div>
-      <p className="text-[#b5bac1] font-medium animate-pulse">Connecting to VibeSpace...</p>
+      <p class="text-[#b5bac1] font-medium animate-pulse">Initializing Voice Engine...</p>
     </div>
   </div>
 
-  <!-- CRITICAL: data-type="module" позволяет Babel использовать импорты внутри скомпилированного кода -->
   <script type="text/babel" data-presets="react,typescript" data-type="module">
     import React, { useState, useEffect, useRef } from 'react';
     import { createRoot } from 'react-dom/client';
     import { 
-      Plus, Hash, Volume2, Mic, Settings, Bell, Search, 
+      Plus, Hash, Volume2, Mic, MicOff, Settings, Bell, Search, 
       Users, HelpCircle, Gift, Sticker, Smile, MessageSquare,
-      Compass, Radio, AtSign
+      Phone, Monitor, MonitorOff, Video, VideoOff, Info, LogOut,
+      Wifi
     } from 'lucide-react';
 
     const INITIAL_SERVERS = [
       { id: '1', name: 'General Community', icon: 'https://api.dicebear.com/7.x/initials/svg?seed=GC&backgroundColor=5865f2', channels: [
         { id: 'c1', name: 'general', type: 'text' },
-        { id: 'c2', name: 'announcements', type: 'text' },
-        { id: 'v1', name: 'Lounge', type: 'voice' }
+        { id: 'c2', name: 'dev-chat', type: 'text' },
+        { id: 'v1', name: 'Lounge', type: 'voice' },
+        { id: 'v2', name: 'Gaming', type: 'voice' }
       ]},
-      { id: '2', name: 'React Mastery', icon: 'https://api.dicebear.com/7.x/initials/svg?seed=RM&backgroundColor=23a559', channels: [
-        { id: 'c3', name: 'react-help', type: 'text' },
-        { id: 'c4', name: 'showcase', type: 'text' }
-      ]},
-      { id: '3', name: 'Gaming Zone', icon: 'https://api.dicebear.com/7.x/initials/svg?seed=GZ&backgroundColor=f23f43', channels: [
-        { id: 'c5', name: 'lobby', type: 'text' },
-        { id: 'v2', name: 'Voice Chat', type: 'voice' }
+      { id: '2', name: 'React World', icon: 'https://api.dicebear.com/7.x/initials/svg?seed=RW&backgroundColor=23a559', channels: [
+        { id: 'c3', name: 'help', type: 'text' },
+        { id: 'v3', name: 'Study Hall', type: 'voice' }
       ]}
     ];
 
@@ -109,21 +118,17 @@
         <div className="h-screen w-screen flex items-center justify-center bg-[#1e1f22] p-4">
           <div className="bg-[#313338] p-8 rounded-lg shadow-2xl w-full max-w-[480px]">
             <h2 className="text-2xl font-bold text-white mb-2 text-center">Welcome back!</h2>
-            <p className="text-[#b5bac1] mb-6 text-center text-sm">We're so excited to see you again!</p>
+            <p className="text-[#b5bac1] mb-6 text-center text-sm">Join the conversation</p>
             <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block text-[12px] font-bold text-[#b5bac1] uppercase mb-2">Username</label>
-                <input 
-                  autoFocus
-                  className="w-full bg-[#1e1f22] text-[#dbdee1] p-3 rounded border-none outline-none focus:ring-1 focus:ring-[#5865f2] transition-all"
-                  placeholder="What's your name?"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                />
-              </div>
-              <button className="w-full bg-[#5865f2] py-3 rounded font-bold text-white hover:bg-[#4752c4] transition-all active:scale-[0.98]">
-                Log In
+              <input 
+                autoFocus
+                className="w-full bg-[#1e1f22] text-[#dbdee1] p-3 rounded outline-none focus:ring-1 focus:ring-[#5865f2]"
+                placeholder="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+              <button className="w-full bg-[#5865f2] py-3 rounded font-bold text-white hover:bg-[#4752c4] transition-all">
+                Join Space
               </button>
             </form>
           </div>
@@ -137,16 +142,79 @@
       const [activeChannel, setActiveChannel] = useState(INITIAL_SERVERS[0].channels[0]);
       const [messages, setMessages] = useState({});
       const [inputValue, setInputValue] = useState('');
+      
+      // Voice & Media States
+      const [isVoiceConnected, setIsVoiceConnected] = useState(false);
+      const [isMuted, setIsMuted] = useState(false);
+      const [isScreenSharing, setIsScreenSharing] = useState(false);
+      const [stream, setStream] = useState(null);
+      const [screenStream, setScreenStream] = useState(null);
+      
       const scrollRef = useRef(null);
+      const videoRef = useRef(null);
 
       useEffect(() => {
-        // Убираем спиннер после рендера
         document.body.classList.add('loaded');
       }, []);
 
       useEffect(() => {
         if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
       }, [messages, activeChannel]);
+
+      // Handle Voice Channel Join
+      useEffect(() => {
+        if (activeChannel.type === 'voice' && !isVoiceConnected) {
+          joinVoice();
+        }
+      }, [activeChannel]);
+
+      const joinVoice = async () => {
+        try {
+          const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          setStream(mediaStream);
+          setIsVoiceConnected(true);
+        } catch (err) {
+          console.error("Failed to get microphone", err);
+          alert("Microphone access is required for voice channels.");
+        }
+      };
+
+      const disconnectVoice = () => {
+        if (stream) stream.getTracks().forEach(track => track.stop());
+        if (screenStream) screenStream.getTracks().forEach(track => track.stop());
+        setStream(null);
+        setScreenStream(null);
+        setIsVoiceConnected(false);
+        setIsScreenSharing(false);
+        // Switch back to a text channel if we disconnect
+        setActiveChannel(activeServer.channels.find(c => c.type === 'text'));
+      };
+
+      const toggleScreenShare = async () => {
+        if (isScreenSharing) {
+          screenStream.getTracks().forEach(track => track.stop());
+          setScreenStream(null);
+          setIsScreenSharing(false);
+        } else {
+          try {
+            const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            setScreenStream(displayStream);
+            setIsScreenSharing(true);
+            displayStream.getVideoTracks()[0].onended = () => {
+              setIsScreenSharing(false);
+              setScreenStream(null);
+            };
+          } catch (err) {
+            console.error("Screen share failed", err);
+          }
+        }
+      };
+
+      useEffect(() => {
+        if (videoRef.current && screenStream) {
+          videoRef.current.srcObject = screenStream;
+        }
+      }, [screenStream]);
 
       if (!user) return <AuthScreen onLogin={setUser} />;
 
@@ -168,40 +236,32 @@
       };
 
       return (
-        <div className="flex h-screen w-screen overflow-hidden bg-[#1e1f22]">
-          {/* Servers Sidebar */}
+        <div className="flex h-screen w-screen overflow-hidden bg-[#1e1f22] select-none">
+          {/* Servers */}
           <nav className="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 space-y-2 flex-shrink-0">
             <div className="w-12 h-12 bg-[#313338] rounded-[24px] flex items-center justify-center cursor-pointer hover:rounded-[16px] hover:bg-[#5865f2] transition-all group">
-              <MessageSquare className="text-white group-hover:scale-110 transition-transform" size={24} />
+              <MessageSquare className="text-white" size={24} />
             </div>
-            <div className="w-8 h-[2px] bg-[#35363c] rounded-full mx-auto"></div>
+            <div className="w-8 h-[2px] bg-[#35363c] rounded-full"></div>
             {INITIAL_SERVERS.map(s => (
-              <div key={s.id} className="relative group flex items-center justify-center w-full">
-                <div className={`absolute left-0 w-1 bg-white rounded-r-full transition-all duration-200 ${activeServer.id === s.id ? 'h-10' : 'h-2 scale-0 group-hover:scale-100 group-hover:h-5'}`}></div>
-                <div 
-                  onClick={() => { setActiveServer(s); setActiveChannel(s.channels[0]); }}
-                  className={`w-12 h-12 overflow-hidden cursor-pointer transition-all duration-200 ${activeServer.id === s.id ? 'rounded-[16px]' : 'rounded-[24px] hover:rounded-[16px]'}`}
-                >
-                  <img src={s.icon} className="w-full h-full object-cover" />
-                </div>
+              <div key={s.id} 
+                onClick={() => { setActiveServer(s); setActiveChannel(s.channels[0]); }}
+                className={`w-12 h-12 cursor-pointer transition-all ${activeServer.id === s.id ? 'rounded-[16px]' : 'rounded-[24px] hover:rounded-[16px]'}`}
+              >
+                <img src={s.icon} className="w-full h-full object-cover rounded-inherit" />
               </div>
             ))}
-            <div className="w-12 h-12 bg-[#313338] rounded-[24px] flex items-center justify-center cursor-pointer hover:rounded-[16px] hover:bg-[#23a559] transition-all group">
-              <Plus className="text-[#23a559] group-hover:text-white" size={24} />
-            </div>
           </nav>
 
           {/* Channels Sidebar */}
           <aside className="w-60 bg-[#2b2d31] flex flex-col flex-shrink-0">
-            <header className="h-12 border-b border-[#1f2023] flex items-center px-4 shadow-sm hover:bg-[#35373c] cursor-pointer transition-colors">
+            <header className="h-12 border-b border-[#1f2023] flex items-center px-4 shadow-sm">
               <h1 className="font-bold text-white truncate text-[15px]">{activeServer.name}</h1>
             </header>
+            
             <div className="flex-1 overflow-y-auto px-2 pt-4">
                <div className="mb-4">
-                 <p className="text-[12px] font-bold text-[#949ba4] uppercase px-2 mb-1 flex items-center">
-                   <span className="flex-1">Channels</span>
-                   <Plus size={14} className="cursor-pointer hover:text-white" />
-                 </p>
+                 <p className="text-[12px] font-bold text-[#949ba4] uppercase px-2 mb-1">Channels</p>
                  {activeServer.channels.map(c => (
                    <div 
                      key={c.id}
@@ -214,82 +274,157 @@
                  ))}
                </div>
             </div>
-            {/* User Footer */}
-            <div className="h-[52px] bg-[#232428] px-2 flex items-center gap-2 mt-auto">
-              <div className="relative group cursor-pointer">
-                <img src={user.avatar} className="w-8 h-8 rounded-full" />
+
+            {/* Voice Connection Status */}
+            {isVoiceConnected && (
+              <div className="bg-[#232428] border-b border-[#1f2023] p-2 px-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 text-[#23a559]">
+                    <Wifi size={16} />
+                    <div className="leading-tight">
+                      <p className="text-[13px] font-bold">Voice Connected</p>
+                      <p className="text-[11px] text-[#b5bac1]">{activeServer.name} / {activeChannel.name}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <div className="p-1.5 hover:bg-[#3f4147] rounded cursor-pointer text-[#b5bac1]" title="Connection Info"><Info size={16} /></div>
+                    <div onClick={disconnectVoice} className="p-1.5 hover:bg-[#3f4147] rounded cursor-pointer text-[#f23f43]" title="Disconnect"><LogOut size={16} /></div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                   <button 
+                    onClick={toggleScreenShare}
+                    className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded text-[12px] font-medium transition-colors ${isScreenSharing ? 'bg-[#4e5058] text-white' : 'bg-[#313338] text-white hover:bg-[#4e5058]'}`}
+                   >
+                     {isScreenSharing ? <MonitorOff size={16} /> : <Monitor size={16} />}
+                     Screen
+                   </button>
+                   <button className="flex-1 flex items-center justify-center gap-2 py-1.5 rounded bg-[#313338] text-white hover:bg-[#4e5058] text-[12px] font-medium transition-colors">
+                     <Video size={16} />
+                     Video
+                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* User Profile */}
+            <div className="h-[52px] bg-[#232428] px-2 flex items-center gap-2">
+              <div className="relative">
+                <img src={user.avatar} className={`w-8 h-8 rounded-full ${isVoiceConnected && !isMuted ? 'is-speaking' : ''}`} />
                 <div className="absolute bottom-[-1px] right-[-1px] w-3 h-3 bg-[#23a559] rounded-full border-[3px] border-[#232428]"></div>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-bold text-white truncate leading-tight">{user.username}</p>
-                <p className="text-[11px] text-[#b5bac1] leading-tight">Online</p>
+                <p className="text-[13px] font-bold text-white truncate">{user.username}</p>
+                <p className="text-[11px] text-[#b5bac1]">Online</p>
               </div>
               <div className="flex text-[#b5bac1]">
-                <div className="p-1.5 hover:bg-[#3f4147] rounded cursor-pointer transition-colors"><Mic size={18} /></div>
+                <div onClick={() => setIsMuted(!isMuted)} className="p-1.5 hover:bg-[#3f4147] rounded cursor-pointer transition-colors">
+                  {isMuted ? <MicOff size={18} className="text-[#f23f43]" /> : <Mic size={18} />}
+                </div>
                 <div className="p-1.5 hover:bg-[#3f4147] rounded cursor-pointer transition-colors"><Settings size={18} /></div>
               </div>
             </div>
           </aside>
 
-          {/* Main Chat Area */}
-          <main className="flex-1 bg-[#313338] flex flex-col relative min-w-0">
-            <header className="h-12 border-b border-[#1f2023] flex items-center justify-between px-4 shadow-sm z-10 bg-[#313338]/95 backdrop-blur">
-              <div className="flex items-center gap-2 overflow-hidden">
-                <Hash className="text-[#80848e] flex-shrink-0" size={24} />
-                <span className="font-bold text-white truncate text-[15px]">{activeChannel.name}</span>
+          {/* Main Content */}
+          <main className="flex-1 bg-[#313338] flex flex-col min-w-0 relative">
+            <header className="h-12 border-b border-[#1f2023] flex items-center justify-between px-4 shadow-sm z-10 bg-[#313338]/95">
+              <div className="flex items-center gap-2">
+                {activeChannel.type === 'text' ? <Hash className="text-[#80848e]" size={24} /> : <Volume2 className="text-[#80848e]" size={24} />}
+                <span className="font-bold text-white">{activeChannel.name}</span>
               </div>
-              <div className="flex gap-4 text-[#b5bac1] flex-shrink-0">
-                <Bell size={20} className="hover:text-white cursor-pointer transition-colors" />
-                <Search size={20} className="hover:text-white cursor-pointer transition-colors" />
-                <Users size={20} className="hover:text-white cursor-pointer transition-colors" />
-                <HelpCircle size={20} className="hover:text-white cursor-pointer transition-colors" />
+              <div className="flex gap-4 text-[#b5bac1]">
+                <Bell size={20} className="hover:text-white cursor-pointer" />
+                <Users size={20} className="hover:text-white cursor-pointer" />
+                <Search size={20} className="hover:text-white cursor-pointer" />
               </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={scrollRef}>
-              <div className="mb-8 pt-10">
-                <div className="w-20 h-20 bg-[#41434a] rounded-full flex items-center justify-center mb-4 text-white">
-                  <Hash size={48} />
-                </div>
-                <h2 className="text-3xl font-bold text-white mb-2">Welcome to #{activeChannel.name}!</h2>
-                <p className="text-[#b5bac1] text-lg">This is the start of the #{activeChannel.name} channel history.</p>
-                <div className="h-[1px] bg-[#3f4147] w-full mt-6"></div>
-              </div>
-
-              {(messages[activeChannel.id] || []).map(msg => (
-                <div key={msg.id} className="flex gap-4 group hover:bg-[#2e3035] -mx-4 px-4 py-1 transition-colors">
-                  <img src={msg.avatar} className="w-10 h-10 rounded-full flex-shrink-0 cursor-pointer mt-1" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline gap-2">
-                      <span className="font-bold text-white hover:underline cursor-pointer text-[15px]">{msg.author}</span>
-                      <span className="text-[11px] text-[#949ba4] font-medium">
-                        {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                      </span>
+            <div className="flex-1 overflow-y-auto flex flex-col">
+              {/* Screen Share Display */}
+              {isScreenSharing && (
+                <div className="p-4 bg-[#1e1f22]">
+                  <div className="video-preview relative">
+                    <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-contain" />
+                    <div className="absolute top-4 left-4 bg-black/60 px-2 py-1 rounded text-xs font-bold text-white uppercase tracking-wider">
+                      Live
                     </div>
-                    <p className="text-[#dbdee1] leading-[1.375rem] text-[15px] break-words whitespace-pre-wrap">{msg.content}</p>
+                    <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/60 p-2 rounded-lg">
+                      <img src={user.avatar} className="w-6 h-6 rounded-full" />
+                      <span className="text-white text-sm font-medium">{user.username}'s Screen</span>
+                    </div>
                   </div>
                 </div>
-              ))}
+              )}
+
+              {/* Chat Messages */}
+              <div className="flex-1 p-4 space-y-4" ref={scrollRef}>
+                {activeChannel.type === 'voice' && !isScreenSharing && (
+                  <div className="flex flex-wrap gap-4 justify-center items-center py-10 h-full">
+                     <div className="flex flex-col items-center gap-3">
+                        <div className={`w-24 h-24 rounded-full bg-[#1e1f22] flex items-center justify-center border-2 ${isVoiceConnected && !isMuted ? 'border-[#23a559]' : 'border-transparent'}`}>
+                           <img src={user.avatar} className="w-20 h-20 rounded-full" />
+                        </div>
+                        <span className="font-bold text-white">{user.username}</span>
+                     </div>
+                     {/* Placeholder for others */}
+                     <div className="flex flex-col items-center gap-3 opacity-30">
+                        <div className="w-24 h-24 rounded-full bg-[#1e1f22] flex items-center justify-center">
+                           <div className="w-10 h-10 border-4 border-white/10 rounded-full"></div>
+                        </div>
+                        <span className="font-medium text-[#b5bac1]">Waiting for friends...</span>
+                     </div>
+                  </div>
+                )}
+
+                {activeChannel.type === 'text' && (
+                  <>
+                    <div className="mb-8 pt-10">
+                      <div className="w-20 h-20 bg-[#41434a] rounded-full flex items-center justify-center mb-4 text-white">
+                        <Hash size={48} />
+                      </div>
+                      <h2 className="text-3xl font-bold text-white mb-2">Welcome to #{activeChannel.name}!</h2>
+                      <p className="text-[#b5bac1] text-lg">This is the start of a legendary conversation.</p>
+                      <div className="h-[1px] bg-[#3f4147] w-full mt-6"></div>
+                    </div>
+
+                    {(messages[activeChannel.id] || []).map(msg => (
+                      <div key={msg.id} className="flex gap-4 group hover:bg-[#2e3035] -mx-4 px-4 py-1">
+                        <img src={msg.avatar} className="w-10 h-10 rounded-full mt-1 flex-shrink-0" />
+                        <div>
+                          <div className="flex items-baseline gap-2">
+                            <span className="font-bold text-white hover:underline cursor-pointer">{msg.author}</span>
+                            <span className="text-[11px] text-[#949ba4] font-medium">
+                              {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </span>
+                          </div>
+                          <p className="text-[#dbdee1] leading-relaxed break-words">{msg.content}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
             </div>
 
-            <div className="px-4 pb-6 mt-auto">
-              <form onSubmit={handleSendMessage} className="bg-[#383a40] rounded-lg px-4 py-2.5 flex items-center gap-4 shadow-sm">
-                <div className="bg-[#b5bac1] text-[#383a40] rounded-full p-0.5 cursor-pointer hover:bg-white transition-all active:scale-90">
-                  <Plus size={18} strokeWidth={3} />
-                </div>
-                <input 
-                  className="bg-transparent flex-1 outline-none text-[#dbdee1] placeholder-[#6d6f78] text-[15px]"
-                  placeholder={`Message #${activeChannel.name}`}
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                />
-                <div className="flex gap-3 text-[#b5bac1] flex-shrink-0">
-                   <Gift size={20} className="hover:text-white cursor-pointer transition-colors" />
-                   <Sticker size={20} className="hover:text-white cursor-pointer transition-colors" />
-                   <Smile size={20} className="hover:text-white cursor-pointer transition-colors" />
-                </div>
-              </form>
-            </div>
+            {activeChannel.type === 'text' && (
+              <div className="px-4 pb-6 mt-auto">
+                <form onSubmit={handleSendMessage} className="bg-[#383a40] rounded-lg px-4 py-2.5 flex items-center gap-4">
+                  <Plus className="bg-[#b5bac1] text-[#383a40] rounded-full p-0.5 cursor-pointer hover:bg-white transition-all" size={20} />
+                  <input 
+                    className="bg-transparent flex-1 outline-none text-[#dbdee1] placeholder-[#6d6f78]"
+                    placeholder={`Message #${activeChannel.name}`}
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                  />
+                  <div className="flex gap-3 text-[#b5bac1]">
+                     <Gift size={20} className="hover:text-white cursor-pointer" />
+                     <Sticker size={20} className="hover:text-white cursor-pointer" />
+                     <Smile size={20} className="hover:text-white cursor-pointer" />
+                  </div>
+                </form>
+              </div>
+            )}
           </main>
         </div>
       );
